@@ -3,37 +3,34 @@ package com.example.demo.filter;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Bucket4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.filter.OncePerRequestFilter;
+import io.github.bucket4j.Refill;
 
-import javax.servlet.FilterChain;
-import javax.servlet.http.HttpServletRequest;
+import javax.servlet.*;
 import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
-public class IpRateLimitingFilter extends OncePerRequestFilter {
+public class IpRateLimitingFilter implements Filter {
 
-    private final Map<String, Bucket> cache = new ConcurrentHashMap<>();
+    private final Bucket bucket;
 
-    private Bucket newBucket() {
-        return Bucket4j.builder()
-                .addLimit(Bandwidth.simple(10, Duration.ofMinutes(1)))
+    public IpRateLimitingFilter() {
+        Bandwidth limit = Bandwidth.classic(10, Refill.intervally(10, Duration.ofMinutes(1)));
+        this.bucket = Bucket4j.builder()
+                .addLimit(limit)
                 .build();
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws java.io.IOException, javax.servlet.ServletException {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null) ip = request.getRemoteAddr();
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
 
-        Bucket bucket = cache.computeIfAbsent(ip, k -> newBucket());
         if (bucket.tryConsume(1)) {
-            filterChain.doFilter(request, response);
+            chain.doFilter(request, response);
         } else {
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.setHeader("Retry-After", "60");
+            HttpServletResponse res = (HttpServletResponse) response;
+            res.setStatus(429);
+            res.getWriter().write("Too Many Requests");
         }
     }
 }
