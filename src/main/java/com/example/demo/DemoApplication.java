@@ -1,15 +1,20 @@
 package com.example.demo;
 
 import com.example.demo.entity.User;
+import com.example.demo.filter.IpRateLimitingFilter;
 import com.example.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @SpringBootApplication
 @RestController
+@EnableAsync
 public class DemoApplication {
 
 	@Autowired
@@ -32,6 +37,13 @@ public class DemoApplication {
 		user.setLastName("Spring Boot");
 		userRepository.save(user);
 		return "User added successfully";
+	}
+
+	@Bean
+	public FilterRegistrationBean<IpRateLimitingFilter> ipRateLimitFilter() {
+		FilterRegistrationBean<IpRateLimitingFilter> bean = new FilterRegistrationBean<>(new IpRateLimitingFilter());
+		bean.addUrlPatterns("/api/*");
+		return bean;
 	}
 
 }
